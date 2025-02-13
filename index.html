@@ -79,18 +79,6 @@
             border-radius: 5px;
             background: #e3f2fd;
         }
-        .confidence-meter {
-            height: 4px;
-            background: #ddd;
-            margin: 10px 0;
-            border-radius: 2px;
-        }
-        .confidence-level {
-            height: 100%;
-            background: #4CAF50;
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
     </style>
 </head>
 <body>
@@ -113,9 +101,6 @@
         </div>
 
         <div class="status" id="status">Ready to record...</div>
-        <div class="confidence-meter">
-            <div class="confidence-level" id="confidenceMeter"></div>
-        </div>
         <textarea id="output" placeholder="Your speech will appear here in real-time..."></textarea>
     </div>
 
@@ -127,84 +112,57 @@
         const output = document.getElementById('output');
         const langSelect = document.getElementById('langSelect');
         const status = document.getElementById('status');
-        const confidenceMeter = document.getElementById('confidenceMeter');
         let recognition = null;
         let isRecording = false;
         let currentTranscript = '';
-        let audioContext = null;
-        let analyser = null;
 
-        const speechSettings = {
-            noiseSuppression: true,
-            echoCancellation: true,
-            autoGainControl: true,
-            channelCount: 1
-        };
-
-        // Enhanced Swedish vocabulary and patterns
-        const swedishPatterns = {
-            numbers: /\b(noll|ett|två|tre|fyra|fem|sex|sju|åtta|nio|tio)\b/gi,
-            timeExpressions: /\b(\d{1,2}\s*minuter|\d{1,2}\s*timmar)\b/gi,
-            classroomTerms: /\b(lektion|område|sportlov|grejer|ord|kahoot)\b/gi,
-            commands: /\b(ta fram|gör|rita|finn|kör|fixa)\b/gi,
-            transitions: /\b(så här|så att|på slutet|okej)\b/gi
-        };
-
-        async function setupVoiceDetection() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: speechSettings,
-                    video: false
-                });
-                
-                audioContext = new AudioContext();
-                analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(stream);
-                
-                analyser.minDecibels = -45;
-                analyser.smoothingTimeConstant = 0.8;
-                analyser.fftSize = 1024;
-                
-                source.connect(analyser);
-                
-                // Start monitoring voice levels
-                monitorVoiceLevel();
-            } catch (error) {
-                console.error('Error setting up voice detection:', error);
+        const audioConfig = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1,
+                sampleRate: 48000,
+                sampleSize: 16,
+                volume: 1.0
             }
-        }
-
-        function monitorVoiceLevel() {
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            function updateLevel() {
-                if (isRecording) {
-                    analyser.getByteFrequencyData(dataArray);
-                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                    const normalizedLevel = Math.min(100, (average / 128) * 100);
-                    
-                    confidenceMeter.style.width = `${normalizedLevel}%`;
-                    requestAnimationFrame(updateLevel);
-                }
-            }
-            
-            updateLevel();
-        }
+        };
 
         function initializeSpeechRecognition() {
             if ('webkitSpeechRecognition' in window) {
                 recognition = new webkitSpeechRecognition();
                 recognition.continuous = true;
-                recognition.interimResults = false;
+                recognition.interimResults = true;
                 recognition.maxAlternatives = 1;
                 recognition.lang = langSelect.value;
 
                 setupRecognitionHandlers();
-                setupVoiceDetection();
+                setupAudioInput();
             } else {
                 status.textContent = "Speech recognition not supported. Please use Chrome.";
                 disableButtons();
             }
+        }
+
+        function setupAudioInput() {
+            navigator.mediaDevices.getUserMedia(audioConfig)
+                .then(stream => {
+                    const audioTracks = stream.getAudioTracks();
+                    audioTracks.forEach(track => {
+                        track.enabled = true;
+                        track.applyConstraints({
+                            advanced: [{
+                                autoGainControl: true,
+                                echoCancellation: true,
+                                noiseSuppression: true
+                            }]
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Microphone access error:', error);
+                    status.textContent = "Error accessing microphone. Please check permissions.";
+                });
         }
 
         function setupRecognitionHandlers() {
@@ -232,15 +190,22 @@
             };
 
             recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const result = event.results[i];
-                    if (result.isFinal && result[0].confidence > 0.7) {
-                        const transcript = result[0].transcript;
-                        const processedText = smartPunctuation(transcript);
-                        currentTranscript += processedText + ' ';
-                        output.value = currentTranscript;
-                        output.scrollTop = output.scrollHeight;
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += smartPunctuation(transcript) + ' ';
+                    } else {
+                        interimTranscript += transcript;
                     }
+                }
+
+                if (finalTranscript) {
+                    currentTranscript += finalTranscript;
+                    output.value = currentTranscript;
+                    output.scrollTop = output.scrollHeight;
                 }
             };
         }
@@ -258,22 +223,48 @@
         }
 
         function smartPunctuation(text) {
-            text = text.trim();
-            
-            // Apply Swedish patterns
-            Object.entries(swedishPatterns).forEach(([key, pattern]) => {
-                text = text.replace(pattern, match => {
-                    return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
-                });
-            });
+            const lang = recognition.lang;
+            text = text.trim().replace(/\s+/g, ' ');
 
-            // Add proper punctuation
+            if (lang === 'sv-SE') {
+                text = applySwedishRules(text);
+            } else {
+                text = applyEnglishRules(text);
+            }
+
+            return text;
+        }
+
+        function applySwedishRules(text) {
+            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems)\b[^.!?]*$/gi;
+            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra)\b[^.!?]*$/gi;
+            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade)\b\s+(att\s+)?([^.!?]+)/gi;
+
+            text = text.replace(swedishQuestionWords, match => `${match}?`);
+            text = text.replace(swedishExclamations, match => `${match}!`);
+            text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
+
+            return applyCommonFormatting(text);
+        }
+
+        function applyEnglishRules(text) {
+            const englishQuestionWords = /\b(what|how|why|when|where|who|which|whose|whom)\b[^.!?]*$/gi;
+            const englishExclamations = /\b(wow|amazing|great|awesome|excellent)\b[^.!?]*$/gi;
+
+            text = text.replace(englishQuestionWords, match => `${match}?`);
+            text = text.replace(englishExclamations, match => `${match}!`);
+
+            return applyCommonFormatting(text);
+        }
+
+        function applyCommonFormatting(text) {
+            text = text.replace(/([.!?])\s*([a-zA-Z])/g, (_, punct, letter) => 
+                `${punct} ${letter.toUpperCase()}`);
+            text = text.replace(/\b(and|or|but)\b/g, ', $1');
+            text = text.charAt(0).toUpperCase() + text.slice(1);
+            
             if (!text.match(/[.!?]$/)) {
-                if (text.match(/\b(vad|hur|varför|när|var|vem)\b/i)) {
-                    text += '?';
-                } else {
-                    text += '.';
-                }
+                text += '.';
             }
 
             return text;
