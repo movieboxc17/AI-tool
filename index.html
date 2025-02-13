@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Speech Transcriber</title>
+    <title>Advanced Swedish Speech Transcriber</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -88,7 +88,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Real-time Speech Transcriber</h1>
+        <h1>Advanced Swedish Speech Transcriber</h1>
         
         <div class="controls">
             <button id="startBtn">Start Recording</button>
@@ -99,9 +99,6 @@
                 <option value="sv-SE">Swedish</option>
                 <option value="en-US">English (US)</option>
                 <option value="en-GB">English (UK)</option>
-                <option value="es-ES">Spanish</option>
-                <option value="fr-FR">French</option>
-                <option value="de-DE">German</option>
                 <option value="no-NO">Norwegian</option>
                 <option value="da-DK">Danish</option>
                 <option value="fi-FI">Finnish</option>
@@ -124,12 +121,20 @@
         let isRecording = false;
         let currentTranscript = '';
 
+        const swedishVocabulary = {
+            numbers: /\b(ett|två|tre|fyra|fem|sex|sju|åtta|nio|tio)\b/gi,
+            dates: /\b(måndag|tisdag|onsdag|torsdag|fredag|lördag|söndag|januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\b/gi,
+            commonPhrases: /\b(godmorgon|goddag|godkväll|hejdå|tack|varsågod|förlåt|ursäkta|snälla|vänligen)\b/gi,
+            formalPhrases: /\b(härmed|således|följaktligen|dessutom|emellertid|dock|samt|även|enligt|beträffande)\b/gi,
+            emotions: /\b(glad|ledsen|arg|rädd|överraskad|trött|stressad|lugn|orolig|nöjd)\b/gi
+        };
+
         function initializeSpeechRecognition() {
             if ('webkitSpeechRecognition' in window) {
                 recognition = new webkitSpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.maxAlternatives = 1;
+                recognition.maxAlternatives = 3;
                 recognition.lang = langSelect.value;
 
                 setupRecognitionHandlers();
@@ -156,7 +161,6 @@
             };
 
             recognition.onerror = (event) => {
-                console.log('Speech recognition error:', event.error);
                 if (event.error !== 'no-speech') {
                     status.textContent = `Error: ${event.error}`;
                     isRecording = false;
@@ -177,7 +181,6 @@
                     }
                 }
 
-                // Update the output in real-time
                 if (finalTranscript) {
                     currentTranscript += finalTranscript;
                     output.value = currentTranscript;
@@ -198,27 +201,21 @@
             saveBtn.disabled = true;
         }
 
-        function smartPunctuation(text) {
-            const lang = recognition.lang;
-            text = text.trim().replace(/\s+/g, ' ');
-
-            if (lang === 'sv-SE') {
-                text = applySwedishRules(text);
-            } else {
-                text = applyEnglishRules(text);
-            }
-
-            return applyCommonFormatting(text);
-        }
-
         function applySwedishRules(text) {
-            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems)\b[^.!?]*$/gi;
-            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra)\b[^.!?]*$/gi;
-            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade)\b\s+(att\s+)?([^.!?]+)/gi;
+            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems|hurdan|varifrån|vart|varav|varmed|varför|vartill)\b[^.!?]*$/gi;
+            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra|toppen|superbra|kanon|grymt|perfekt|lysande|strålande|utmärkt|brilliant|fenomenalt)\b[^.!?]*$/gi;
+            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade|påstod|menade|förklarade|beskrev|uttryckte|konstaterade|påpekade)\b\s+(att\s+)?([^.!?]+)/gi;
+            const swedishConjunctions = /\b(och|eller|men|för|att|eftersom|därför|så|när|om|innan|efter|sedan|fastän|trots)\b/gi;
 
             text = text.replace(swedishQuestionWords, match => `${match}?`);
             text = text.replace(swedishExclamations, match => `${match}!`);
             text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
+
+            // Apply Swedish vocabulary rules
+            Object.keys(swedishVocabulary).forEach(ruleKey => {
+                text = text.replace(swedishVocabulary[ruleKey], match => 
+                    match.charAt(0).toUpperCase() + match.slice(1).toLowerCase());
+            });
 
             return text;
         }
@@ -230,6 +227,20 @@
             text = text.replace(englishQuestionWords, match => `${match}?`);
             text = text.replace(englishExclamations, match => `${match}!`);
 
+            return text;
+        }
+
+        function smartPunctuation(text) {
+            const lang = recognition.lang;
+            text = text.trim().replace(/\s+/g, ' ');
+
+            if (lang === 'sv-SE') {
+                text = applySwedishRules(text);
+            } else {
+                text = applyEnglishRules(text);
+            }
+
+            text = applyCommonFormatting(text);
             return text;
         }
 
