@@ -3,28 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Speech Transcriber</title>
+    <title>Professional Speech Transcriber</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
-            background: #f5f5f5;
+            background: #f8f9fa;
         }
         #output {
             width: 100%;
-            min-height: 300px;
+            min-height: 400px;
             margin: 20px 0;
-            padding: 15px;
+            padding: 20px;
             border: 2px solid #2196F3;
             border-radius: 8px;
-            font-size: 16px;
-            line-height: 1.5;
+            font-size: 18px;
+            line-height: 1.6;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
         }
         button {
             padding: 12px 25px;
-            margin: 5px;
             font-size: 16px;
             cursor: pointer;
             background: #2196F3;
@@ -35,44 +41,62 @@
         }
         button:hover {
             background: #1976D2;
+            transform: translateY(-2px);
         }
         .recording {
             background-color: #f44336;
             animation: pulse 1.5s infinite;
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
+        .settings {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
         }
-        #langSelect {
-            padding: 10px;
-            margin: 5px;
-            font-size: 16px;
-            border-radius: 5px;
+        .audio-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
         }
-        .status {
-            color: #2196F3;
-            font-weight: bold;
+        #volumeLevel {
+            width: 200px;
         }
     </style>
 </head>
 <body>
-    <h1>Advanced Speech Transcriber</h1>
-    <select id="langSelect">
-        <option value="en-US">English (US)</option>
-        <option value="en-GB">English (UK)</option>
-        <option value="es-ES">Spanish</option>
-        <option value="fr-FR">French</option>
-        <option value="de-DE">German</option>
-        <option value="it-IT">Italian</option>
-    </select>
-    <button id="startBtn">Start Recording</button>
-    <button id="stopBtn" disabled>Stop Recording</button>
-    <button id="saveBtn">Save Transcript</button>
-    <button id="clearBtn">Clear Text</button>
-    <p class="status" id="status">Ready to record...</p>
-    <textarea id="output" placeholder="Your speech will appear here in real-time..."></textarea>
+    <h1>Professional Speech Transcriber</h1>
+    
+    <div class="settings">
+        <div class="audio-controls">
+            <label>Input Volume:</label>
+            <input type="range" id="volumeLevel" min="0" max="2" step="0.1" value="1">
+            <span id="volumeValue">1.0</span>
+        </div>
+        <div class="audio-controls">
+            <label>Noise Reduction:</label>
+            <select id="noiseReduction">
+                <option value="aggressive">High</option>
+                <option value="moderate" selected>Medium</option>
+                <option value="mild">Low</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="startBtn">Start Recording</button>
+        <button id="stopBtn" disabled>Stop Recording</button>
+        <button id="saveBtn">Save Transcript</button>
+        <button id="clearBtn">Clear Text</button>
+        <select id="langSelect">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Spanish</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+        </select>
+    </div>
+
+    <textarea id="output" placeholder="Your speech will appear here with proper punctuation..."></textarea>
 
     <script>
         const startBtn = document.getElementById('startBtn');
@@ -81,8 +105,16 @@
         const clearBtn = document.getElementById('clearBtn');
         const output = document.getElementById('output');
         const langSelect = document.getElementById('langSelect');
-        const status = document.getElementById('status');
+        const volumeLevel = document.getElementById('volumeLevel');
+        const volumeValue = document.getElementById('volumeValue');
         let recognition = null;
+        let audioContext = null;
+        let mediaStream = null;
+
+        // Update volume display
+        volumeLevel.addEventListener('input', () => {
+            volumeValue.textContent = volumeLevel.value;
+        });
 
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
@@ -90,7 +122,7 @@
             recognition.interimResults = true;
 
             // Enhanced settings for better accuracy
-            recognition.maxAlternatives = 3;
+            recognition.maxAlternatives = 5;
             recognition.lang = langSelect.value;
 
             recognition.onresult = (event) => {
@@ -99,8 +131,10 @@
 
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
+                    
+                    // Enhanced punctuation processing
                     if (event.results[i].isFinal) {
-                        finalTranscript += transcript + ' ';
+                        finalTranscript += processPunctuation(transcript) + ' ';
                     } else {
                         interimTranscript += transcript;
                     }
@@ -111,27 +145,57 @@
                     output.scrollTop = output.scrollHeight;
                 }
             };
-
-            recognition.onstart = () => {
-                status.textContent = "Listening...";
-            };
-
-            recognition.onend = () => {
-                status.textContent = "Paused. Click Start to resume.";
-            };
-
-            recognition.onerror = (event) => {
-                status.textContent = "Error: " + event.error;
-            };
         }
 
-        langSelect.onchange = () => {
-            if (recognition) {
-                recognition.lang = langSelect.value;
-            }
-        };
+        // Advanced punctuation processing
+        function processPunctuation(text) {
+            // Add period if sentence ends without punctuation
+            text = text.replace(/(\w+)(\s+)(?=[A-Z])/g, '$1.$2');
+            
+            // Add question mark for questions
+            text = text.replace(/\b(what|how|why|when|where|who|which|whose|whom)\b.+?(?=[.!?]|$)/gi, 
+                match => match.trim() + '?');
+            
+            // Add exclamation for emphasis words
+            text = text.replace(/\b(wow|amazing|great|awesome|excellent)\b.+?(?=[.!?]|$)/gi, 
+                match => match.trim() + '!');
+            
+            // Add proper spacing for punctuation
+            text = text.replace(/\s+([.,!?])/g, '$1 ');
+            
+            // Capitalize first letter of sentences
+            text = text.replace(/(^\w|\.\s+\w)/g, letter => letter.toUpperCase());
+            
+            return text;
+        }
 
-        startBtn.addEventListener('click', () => {
+        async function setupAudio() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                const gainNode = audioContext.createGain();
+                const analyser = audioContext.createAnalyser();
+
+                // Apply volume boost
+                gainNode.gain.value = volumeLevel.value;
+                
+                // Connect nodes
+                source.connect(gainNode);
+                gainNode.connect(analyser);
+                analyser.connect(audioContext.destination);
+
+                volumeLevel.addEventListener('input', () => {
+                    gainNode.gain.value = volumeLevel.value;
+                });
+            } catch (error) {
+                console.error('Audio setup failed:', error);
+            }
+        }
+
+        startBtn.addEventListener('click', async () => {
+            await setupAudio();
             recognition.start();
             startBtn.disabled = true;
             stopBtn.disabled = false;
@@ -140,6 +204,9 @@
 
         stopBtn.addEventListener('click', () => {
             recognition.stop();
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+            }
             startBtn.disabled = false;
             stopBtn.disabled = true;
             startBtn.classList.remove('recording');
@@ -153,14 +220,16 @@
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             a.href = url;
             a.download = `transcript-${timestamp}.txt`;
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
         });
 
         clearBtn.addEventListener('click', () => {
             output.value = '';
+        });
+
+        langSelect.addEventListener('change', () => {
+            recognition.lang = langSelect.value;
         });
     </script>
 </body>
