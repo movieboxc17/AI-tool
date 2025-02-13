@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multilingual Smart Transcriber</title>
+    <title>Real-time Speech Transcriber</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -88,7 +88,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Multilingual Smart Transcriber</h1>
+        <h1>Real-time Speech Transcriber</h1>
         
         <div class="controls">
             <button id="startBtn">Start Recording</button>
@@ -109,7 +109,7 @@
         </div>
 
         <div class="status" id="status">Ready to record...</div>
-        <textarea id="output" placeholder="Your speech will appear here with smart punctuation..."></textarea>
+        <textarea id="output" placeholder="Your speech will appear here in real-time..."></textarea>
     </div>
 
     <script>
@@ -122,13 +122,14 @@
         const status = document.getElementById('status');
         let recognition = null;
         let isRecording = false;
+        let currentTranscript = '';
 
         function initializeSpeechRecognition() {
             if ('webkitSpeechRecognition' in window) {
                 recognition = new webkitSpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.maxAlternatives = 10;
+                recognition.maxAlternatives = 1;
                 recognition.lang = langSelect.value;
 
                 setupRecognitionHandlers();
@@ -164,16 +165,22 @@
             };
 
             recognition.onresult = (event) => {
+                let interimTranscript = '';
                 let finalTranscript = '';
+
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
                         finalTranscript += smartPunctuation(transcript) + ' ';
+                    } else {
+                        interimTranscript += transcript;
                     }
                 }
 
+                // Update the output in real-time
                 if (finalTranscript) {
-                    output.value += finalTranscript;
+                    currentTranscript += finalTranscript;
+                    output.value = currentTranscript;
                     output.scrollTop = output.scrollHeight;
                 }
             };
@@ -240,6 +247,7 @@
         }
 
         startBtn.addEventListener('click', () => {
+            currentTranscript = output.value;
             isRecording = true;
             recognition.start();
             updateButtonStates();
@@ -266,6 +274,7 @@
 
         clearBtn.addEventListener('click', () => {
             output.value = '';
+            currentTranscript = '';
         });
 
         langSelect.addEventListener('change', () => {
