@@ -12,6 +12,12 @@
             padding: 20px;
             background: #f8f9fa;
         }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
         #output {
             width: 100%;
             min-height: 400px;
@@ -22,12 +28,14 @@
             font-size: 18px;
             line-height: 1.6;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            resize: vertical;
         }
         .controls {
             display: flex;
             gap: 10px;
             margin: 20px 0;
             flex-wrap: wrap;
+            align-items: center;
         }
         button {
             padding: 12px 25px;
@@ -39,9 +47,13 @@
             border-radius: 5px;
             transition: 0.3s;
         }
-        button:hover {
+        button:hover:not(:disabled) {
             background: #1976D2;
             transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         .recording {
             background-color: #f44336;
@@ -57,34 +69,48 @@
             font-size: 16px;
             border-radius: 5px;
             border: 1px solid #2196F3;
+            cursor: pointer;
         }
         .status {
             color: #2196F3;
             font-weight: bold;
             margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #e3f2fd;
+        }
+        h1 {
+            color: #1976D2;
+            text-align: center;
+            margin-bottom: 30px;
         }
     </style>
 </head>
 <body>
-    <h1>Multilingual Smart Transcriber</h1>
-    
-    <div class="controls">
-        <button id="startBtn">Start Recording</button>
-        <button id="stopBtn" disabled>Stop Recording</button>
-        <button id="saveBtn">Save Transcript</button>
-        <button id="clearBtn">Clear Text</button>
-        <select id="langSelect">
-            <option value="sv-SE">Swedish</option>
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="es-ES">Spanish</option>
-            <option value="fr-FR">French</option>
-            <option value="de-DE">German</option>
-        </select>
-    </div>
+    <div class="container">
+        <h1>Multilingual Smart Transcriber</h1>
+        
+        <div class="controls">
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn" disabled>Stop Recording</button>
+            <button id="saveBtn">Save Transcript</button>
+            <button id="clearBtn">Clear Text</button>
+            <select id="langSelect">
+                <option value="sv-SE">Swedish</option>
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="es-ES">Spanish</option>
+                <option value="fr-FR">French</option>
+                <option value="de-DE">German</option>
+                <option value="no-NO">Norwegian</option>
+                <option value="da-DK">Danish</option>
+                <option value="fi-FI">Finnish</option>
+            </select>
+        </div>
 
-    <p class="status" id="status">Ready to record...</p>
-    <textarea id="output" placeholder="Your speech will appear here with smart punctuation..."></textarea>
+        <div class="status" id="status">Ready to record...</div>
+        <textarea id="output" placeholder="Your speech will appear here with smart punctuation..."></textarea>
+    </div>
 
     <script>
         const startBtn = document.getElementById('startBtn');
@@ -95,29 +121,50 @@
         const langSelect = document.getElementById('langSelect');
         const status = document.getElementById('status');
         let recognition = null;
+        let isRecording = false;
 
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.maxAlternatives = 10;
-            recognition.lang = langSelect.value;
+        function initializeSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 10;
+                recognition.lang = langSelect.value;
 
+                setupRecognitionHandlers();
+            } else {
+                status.textContent = "Speech recognition not supported. Please use Chrome.";
+                disableButtons();
+            }
+        }
+
+        function setupRecognitionHandlers() {
             recognition.onstart = () => {
                 status.textContent = "Listening...";
+                isRecording = true;
+                updateButtonStates();
             };
 
             recognition.onend = () => {
-                status.textContent = "Paused. Click Start to resume.";
+                if (isRecording) {
+                    recognition.start();
+                } else {
+                    status.textContent = "Paused. Click Start to resume.";
+                    updateButtonStates();
+                }
             };
 
             recognition.onerror = (event) => {
-                status.textContent = "Error: " + event.error;
+                console.log('Speech recognition error:', event.error);
+                if (event.error !== 'no-speech') {
+                    status.textContent = `Error: ${event.error}`;
+                    isRecording = false;
+                    updateButtonStates();
+                }
             };
 
             recognition.onresult = (event) => {
                 let finalTranscript = '';
-
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
@@ -132,65 +179,89 @@
             };
         }
 
+        function updateButtonStates() {
+            startBtn.disabled = isRecording;
+            stopBtn.disabled = !isRecording;
+            startBtn.classList.toggle('recording', isRecording);
+        }
+
+        function disableButtons() {
+            startBtn.disabled = true;
+            stopBtn.disabled = true;
+            saveBtn.disabled = true;
+        }
+
         function smartPunctuation(text) {
             const lang = recognition.lang;
+            text = text.trim().replace(/\s+/g, ' ');
 
-            // Basic punctuation for all languages
-            text = text.replace(/([.!?])\s*([a-z])/gi, (_, punct, letter) => 
-                punct + ' ' + letter.toUpperCase());
-            
-            // Language-specific rules
             if (lang === 'sv-SE') {
-                // Swedish rules
-                text = text.replace(/\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems)\b.*?(?=[.!?]|$)/gi, 
-                    match => match.trim() + '?');
-                text = text.replace(/\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra)\b.*?(?=[.!?]|$)/gi, 
-                    match => match.trim() + '!');
-                text = text.replace(/\b(sa|säger|berättade|nämnde|frågade|svarade)\b\s+(att\s+)?([^.!?]+)/gi, 
-                    (_, verb, att, speech) => `${verb} ">${speech.trim()}<"`);
+                text = applySwedishRules(text);
             } else {
-                // English and other languages
-                text = text.replace(/\b(what|how|why|when|where|who|which|whose|whom)\b.*?(?=[.!?]|$)/gi, 
-                    match => match.trim() + '?');
-                text = text.replace(/\b(wow|amazing|great|awesome|excellent|oh my god|incredible|fantastic)\b.*?(?=[.!?]|$)/gi, 
-                    match => match.trim() + '!');
-                text = text.replace(/\b(said|says|told|mentioned|asked|replied)\b\s+(that\s+)?([^.!?]+)/gi, 
-                    (_, verb, that, speech) => `${verb} "${speech.trim()}"`);
+                text = applyEnglishRules(text);
             }
 
-            // Common formatting for all languages
-            text = text.replace(/(\s+um\s+|\s+uh\s+|\s+like\s+)/gi, '... ');
-            text = text.replace(/(\w+)(\s+and\s+|\s+or\s+|\s+but\s+)/gi, '$1,$2');
-            text = text.replace(/\s+([.,!?])/g, '$1 ');
-            text = text.replace(/(^\w|[.!?]\s+\w)/g, letter => letter.toUpperCase());
+            return applyCommonFormatting(text);
+        }
+
+        function applySwedishRules(text) {
+            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems)\b[^.!?]*$/gi;
+            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra)\b[^.!?]*$/gi;
+            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade)\b\s+(att\s+)?([^.!?]+)/gi;
+
+            text = text.replace(swedishQuestionWords, match => `${match}?`);
+            text = text.replace(swedishExclamations, match => `${match}!`);
+            text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
+
+            return text;
+        }
+
+        function applyEnglishRules(text) {
+            const englishQuestionWords = /\b(what|how|why|when|where|who|which|whose|whom)\b[^.!?]*$/gi;
+            const englishExclamations = /\b(wow|amazing|great|awesome|excellent)\b[^.!?]*$/gi;
+
+            text = text.replace(englishQuestionWords, match => `${match}?`);
+            text = text.replace(englishExclamations, match => `${match}!`);
+
+            return text;
+        }
+
+        function applyCommonFormatting(text) {
+            text = text.replace(/([.!?])\s*([a-zA-Z])/g, (_, punct, letter) => 
+                `${punct} ${letter.toUpperCase()}`);
+            text = text.replace(/\b(and|or|but)\b/g, ', $1');
+            text = text.charAt(0).toUpperCase() + text.slice(1);
             
+            if (!text.match(/[.!?]$/)) {
+                text += '.';
+            }
+
             return text;
         }
 
         startBtn.addEventListener('click', () => {
+            isRecording = true;
             recognition.start();
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            startBtn.classList.add('recording');
+            updateButtonStates();
         });
 
         stopBtn.addEventListener('click', () => {
+            isRecording = false;
             recognition.stop();
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            startBtn.classList.remove('recording');
+            updateButtonStates();
         });
 
         saveBtn.addEventListener('click', () => {
-            const text = output.value;
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            a.href = url;
-            a.download = `transcript-${timestamp}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
+            if (output.value) {
+                const blob = new Blob([output.value], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                a.href = url;
+                a.download = `transcript-${timestamp}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
         });
 
         clearBtn.addEventListener('click', () => {
@@ -198,12 +269,14 @@
         });
 
         langSelect.addEventListener('change', () => {
+            if (isRecording) {
+                recognition.stop();
+            }
             recognition.lang = langSelect.value;
-            recognition.stop();
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            startBtn.classList.remove('recording');
+            status.textContent = `Language changed to: ${langSelect.options[langSelect.selectedIndex].text}`;
         });
+
+        initializeSpeechRecognition();
     </script>
 </body>
 </html>
