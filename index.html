@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Voice Recognition Transcriber</title>
+    <title>Advanced Swedish Speech Transcriber</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -79,11 +79,16 @@
             border-radius: 5px;
             background: #e3f2fd;
         }
+        h1 {
+            color: #1976D2;
+            text-align: center;
+            margin-bottom: 30px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Advanced Voice Recognition Transcriber</h1>
+        <h1>Advanced Swedish Speech Transcriber</h1>
         
         <div class="controls">
             <button id="startBtn">Start Recording</button>
@@ -116,16 +121,12 @@
         let isRecording = false;
         let currentTranscript = '';
 
-        const audioConfig = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                channelCount: 1,
-                sampleRate: 48000,
-                sampleSize: 16,
-                volume: 1.0
-            }
+        const swedishVocabulary = {
+            numbers: /\b(ett|två|tre|fyra|fem|sex|sju|åtta|nio|tio)\b/gi,
+            dates: /\b(måndag|tisdag|onsdag|torsdag|fredag|lördag|söndag|januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\b/gi,
+            commonPhrases: /\b(godmorgon|goddag|godkväll|hejdå|tack|varsågod|förlåt|ursäkta|snälla|vänligen)\b/gi,
+            formalPhrases: /\b(härmed|således|följaktligen|dessutom|emellertid|dock|samt|även|enligt|beträffande)\b/gi,
+            emotions: /\b(glad|ledsen|arg|rädd|överraskad|trött|stressad|lugn|orolig|nöjd)\b/gi
         };
 
         function initializeSpeechRecognition() {
@@ -133,36 +134,14 @@
                 recognition = new webkitSpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.maxAlternatives = 1;
+                recognition.maxAlternatives = 3;
                 recognition.lang = langSelect.value;
 
                 setupRecognitionHandlers();
-                setupAudioInput();
             } else {
                 status.textContent = "Speech recognition not supported. Please use Chrome.";
                 disableButtons();
             }
-        }
-
-        function setupAudioInput() {
-            navigator.mediaDevices.getUserMedia(audioConfig)
-                .then(stream => {
-                    const audioTracks = stream.getAudioTracks();
-                    audioTracks.forEach(track => {
-                        track.enabled = true;
-                        track.applyConstraints({
-                            advanced: [{
-                                autoGainControl: true,
-                                echoCancellation: true,
-                                noiseSuppression: true
-                            }]
-                        });
-                    });
-                })
-                .catch(error => {
-                    console.error('Microphone access error:', error);
-                    status.textContent = "Error accessing microphone. Please check permissions.";
-                });
         }
 
         function setupRecognitionHandlers() {
@@ -222,6 +201,35 @@
             saveBtn.disabled = true;
         }
 
+        function applySwedishRules(text) {
+            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems|hurdan|varifrån|vart|varav|varmed|varför|vartill)\b[^.!?]*$/gi;
+            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra|toppen|superbra|kanon|grymt|perfekt|lysande|strålande|utmärkt|brilliant|fenomenalt)\b[^.!?]*$/gi;
+            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade|påstod|menade|förklarade|beskrev|uttryckte|konstaterade|påpekade)\b\s+(att\s+)?([^.!?]+)/gi;
+            const swedishConjunctions = /\b(och|eller|men|för|att|eftersom|därför|så|när|om|innan|efter|sedan|fastän|trots)\b/gi;
+
+            text = text.replace(swedishQuestionWords, match => `${match}?`);
+            text = text.replace(swedishExclamations, match => `${match}!`);
+            text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
+
+            // Apply Swedish vocabulary rules
+            Object.keys(swedishVocabulary).forEach(ruleKey => {
+                text = text.replace(swedishVocabulary[ruleKey], match => 
+                    match.charAt(0).toUpperCase() + match.slice(1).toLowerCase());
+            });
+
+            return text;
+        }
+
+        function applyEnglishRules(text) {
+            const englishQuestionWords = /\b(what|how|why|when|where|who|which|whose|whom)\b[^.!?]*$/gi;
+            const englishExclamations = /\b(wow|amazing|great|awesome|excellent)\b[^.!?]*$/gi;
+
+            text = text.replace(englishQuestionWords, match => `${match}?`);
+            text = text.replace(englishExclamations, match => `${match}!`);
+
+            return text;
+        }
+
         function smartPunctuation(text) {
             const lang = recognition.lang;
             text = text.trim().replace(/\s+/g, ' ');
@@ -232,29 +240,8 @@
                 text = applyEnglishRules(text);
             }
 
+            text = applyCommonFormatting(text);
             return text;
-        }
-
-        function applySwedishRules(text) {
-            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems)\b[^.!?]*$/gi;
-            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra)\b[^.!?]*$/gi;
-            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade)\b\s+(att\s+)?([^.!?]+)/gi;
-
-            text = text.replace(swedishQuestionWords, match => `${match}?`);
-            text = text.replace(swedishExclamations, match => `${match}!`);
-            text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
-
-            return applyCommonFormatting(text);
-        }
-
-        function applyEnglishRules(text) {
-            const englishQuestionWords = /\b(what|how|why|when|where|who|which|whose|whom)\b[^.!?]*$/gi;
-            const englishExclamations = /\b(wow|amazing|great|awesome|excellent)\b[^.!?]*$/gi;
-
-            text = text.replace(englishQuestionWords, match => `${match}?`);
-            text = text.replace(englishExclamations, match => `${match}!`);
-
-            return applyCommonFormatting(text);
         }
 
         function applyCommonFormatting(text) {
