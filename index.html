@@ -3,45 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech to Text Transcriber</title>
+    <title>Advanced Speech Transcriber</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            background: #f5f5f5;
         }
         #output {
             width: 100%;
-            min-height: 200px;
+            min-height: 300px;
             margin: 20px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
+            padding: 15px;
+            border: 2px solid #2196F3;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.5;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 25px;
             margin: 5px;
             font-size: 16px;
             cursor: pointer;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #1976D2;
         }
         .recording {
-            background-color: #ff4444;
-            color: white;
+            background-color: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        #langSelect {
+            padding: 10px;
+            margin: 5px;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        .status {
+            color: #2196F3;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>Speech to Text Transcriber</h1>
+    <h1>Advanced Speech Transcriber</h1>
+    <select id="langSelect">
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="es-ES">Spanish</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="it-IT">Italian</option>
+    </select>
     <button id="startBtn">Start Recording</button>
     <button id="stopBtn" disabled>Stop Recording</button>
     <button id="saveBtn">Save Transcript</button>
-    <textarea id="output" placeholder="Transcribed text will appear here..."></textarea>
+    <button id="clearBtn">Clear Text</button>
+    <p class="status" id="status">Ready to record...</p>
+    <textarea id="output" placeholder="Your speech will appear here in real-time..."></textarea>
 
     <script>
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const saveBtn = document.getElementById('saveBtn');
+        const clearBtn = document.getElementById('clearBtn');
         const output = document.getElementById('output');
+        const langSelect = document.getElementById('langSelect');
+        const status = document.getElementById('status');
         let recognition = null;
 
         if ('webkitSpeechRecognition' in window) {
@@ -49,24 +89,47 @@
             recognition.continuous = true;
             recognition.interimResults = true;
 
+            // Enhanced settings for better accuracy
+            recognition.maxAlternatives = 3;
+            recognition.lang = langSelect.value;
+
             recognition.onresult = (event) => {
+                let interimTranscript = '';
                 let finalTranscript = '';
+
                 for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
                     }
                 }
+
                 if (finalTranscript) {
-                    output.value += finalTranscript + ' ';
+                    output.value += finalTranscript;
+                    output.scrollTop = output.scrollHeight;
                 }
             };
 
-            recognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
+            recognition.onstart = () => {
+                status.textContent = "Listening...";
             };
-        } else {
-            alert('Speech recognition is not supported in this browser. Please use Chrome.');
+
+            recognition.onend = () => {
+                status.textContent = "Paused. Click Start to resume.";
+            };
+
+            recognition.onerror = (event) => {
+                status.textContent = "Error: " + event.error;
+            };
         }
+
+        langSelect.onchange = () => {
+            if (recognition) {
+                recognition.lang = langSelect.value;
+            }
+        };
 
         startBtn.addEventListener('click', () => {
             recognition.start();
@@ -87,12 +150,17 @@
             const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             a.href = url;
-            a.download = 'transcript.txt';
+            a.download = `transcript-${timestamp}.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            output.value = '';
         });
     </script>
 </body>
