@@ -3,300 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Advanced Swedish Speech Transcriber with multi-language support">
     <title>Advanced Swedish Speech Transcriber</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f8f9fa;
-        }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        #output {
-            width: 100%;
-            min-height: 400px;
-            margin: 20px 0;
-            padding: 20px;
-            border: 2px solid #2196F3;
-            border-radius: 8px;
-            font-size: 18px;
-            line-height: 1.6;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            resize: vertical;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin: 20px 0;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        button {
-            padding: 12px 25px;
-            font-size: 16px;
-            cursor: pointer;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            transition: 0.3s;
-        }
-        button:hover:not(:disabled) {
-            background: #1976D2;
-            transform: translateY(-2px);
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .recording {
-            background-color: #f44336;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        select {
-            padding: 12px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #2196F3;
-            cursor: pointer;
-        }
-        .status {
-            color: #2196F3;
-            font-weight: bold;
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 5px;
-            background: #e3f2fd;
-        }
-        h1 {
-            color: #1976D2;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/en/4/4c/Flag_of_Sweden.svg">
 </head>
 <body>
     <div class="container">
-        <h1>Advanced Swedish Speech Transcriber</h1>
+        <header>
+            <h1>Advanced Swedish Speech Transcriber</h1>
+            <button id="themeToggle" aria-label="Toggle dark mode">
+                <i class="fas fa-moon"></i>
+            </button>
+        </header>
         
         <div class="controls">
-            <button id="startBtn">Start Recording</button>
-            <button id="stopBtn" disabled>Stop Recording</button>
-            <button id="saveBtn">Save Transcript</button>
-            <button id="clearBtn">Clear Text</button>
-            <select id="langSelect">
-                <option value="sv-SE">Swedish</option>
-                <option value="en-US">English (US)</option>
-                <option value="en-GB">English (UK)</option>
-                <option value="no-NO">Norwegian</option>
-                <option value="da-DK">Danish</option>
-                <option value="fi-FI">Finnish</option>
-            </select>
+            <div class="main-controls">
+                <button id="startBtn" class="primary-btn" aria-label="Start recording">
+                    <i class="fas fa-microphone"></i> Start Recording
+                </button>
+                <button id="stopBtn" class="primary-btn" disabled aria-label="Stop recording">
+                    <i class="fas fa-stop"></i> Stop Recording
+                </button>
+                <button id="pauseBtn" class="secondary-btn" disabled aria-label="Pause recording">
+                    <i class="fas fa-pause"></i> Pause
+                </button>
+                <button id="saveBtn" class="secondary-btn" aria-label="Save transcript">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <button id="clearBtn" class="secondary-btn" aria-label="Clear text">
+                    <i class="fas fa-trash"></i> Clear
+                </button>
+            </div>
+            
+            <div class="language-controls">
+                <label for="langSelect">Language:</label>
+                <select id="langSelect" aria-label="Select language">
+                    <option value="sv-SE">Swedish</option>
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="no-NO">Norwegian</option>
+                    <option value="da-DK">Danish</option>
+                    <option value="fi-FI">Finnish</option>
+                    <option value="de-DE">German</option>
+                    <option value="fr-FR">French</option>
+                </select>
+            </div>
         </div>
 
-        <div class="status" id="status">Ready to record...</div>
-        <textarea id="output" placeholder="Your speech will appear here in real-time..."></textarea>
+        <div class="status-container">
+            <div id="status" class="status" aria-live="polite">Ready to record...</div>
+            <div id="visualizer" class="visualizer"></div>
+            <div id="stats" class="stats">Words: 0 | Characters: 0</div>
+        </div>
+
+        <div class="editor-container">
+            <textarea id="output" 
+                      placeholder="Your speech will appear here in real-time..."
+                      aria-label="Transcription output"
+                      spellcheck="true"></textarea>
+            <div class="toolbar">
+                <button id="copyBtn" class="tool-btn" aria-label="Copy to clipboard">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                <button id="downloadBtn" class="tool-btn" aria-label="Download as text">
+                    <i class="fas fa-download"></i> Text
+                </button>
+                <button id="downloadDocxBtn" class="tool-btn" aria-label="Download as Word">
+                    <i class="fas fa-file-word"></i> Word
+                </button>
+            </div>
+        </div>
+        
+        <div class="tips">
+            <h3><i class="fas fa-lightbulb"></i> Tips</h3>
+            <ul>
+                <li>Speak clearly and at a moderate pace for best results</li>
+                <li>Use the pause button if you need to take a break</li>
+                <li>Try using proper names and specialized terminology clearly</li>
+                <li>For Swedish, common phrases like "tack" and "hej" are recognized better</li>
+            </ul>
+        </div>
     </div>
 
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const saveBtn = document.getElementById('saveBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const output = document.getElementById('output');
-        const langSelect = document.getElementById('langSelect');
-        const status = document.getElementById('status');
-        let recognition = null;
-        let isRecording = false;
-        let currentTranscript = '';
+    <footer>
+        <p>© 2023 Advanced Swedish Speech Transcriber | <a href="#" id="privacyLink">Privacy Policy</a></p>
+    </footer>
 
-        const swedishVocabulary = {
-            numbers: /\b(ett|två|tre|fyra|fem|sex|sju|åtta|nio|tio)\b/gi,
-            dates: /\b(måndag|tisdag|onsdag|torsdag|fredag|lördag|söndag|januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\b/gi,
-            commonPhrases: /\b(godmorgon|goddag|godkväll|hejdå|tack|varsågod|förlåt|ursäkta|snälla|vänligen)\b/gi,
-            formalPhrases: /\b(härmed|således|följaktligen|dessutom|emellertid|dock|samt|även|enligt|beträffande)\b/gi,
-            emotions: /\b(glad|ledsen|arg|rädd|överraskad|trött|stressad|lugn|orolig|nöjd)\b/gi
-        };
+    <div id="privacyModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Privacy Policy</h2>
+            <p>This app processes all speech recognition locally in your browser. No audio data is sent to our servers.</p>
+            <p>Transcriptions are stored only in your browser and can be cleared at any time.</p>
+        </div>
+    </div>
 
-        function initializeSpeechRecognition() {
-            if ('webkitSpeechRecognition' in window) {
-                recognition = new webkitSpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.maxAlternatives = 3;
-                recognition.lang = langSelect.value;
-
-                setupRecognitionHandlers();
-            } else {
-                status.textContent = "Speech recognition not supported. Please use Chrome.";
-                disableButtons();
-            }
-        }
-
-        function setupRecognitionHandlers() {
-            recognition.onstart = () => {
-                status.textContent = "Listening...";
-                isRecording = true;
-                updateButtonStates();
-            };
-
-            recognition.onend = () => {
-                if (isRecording) {
-                    recognition.start();
-                } else {
-                    status.textContent = "Paused. Click Start to resume.";
-                    updateButtonStates();
-                }
-            };
-
-            recognition.onerror = (event) => {
-                if (event.error !== 'no-speech') {
-                    status.textContent = `Error: ${event.error}`;
-                    isRecording = false;
-                    updateButtonStates();
-                }
-            };
-
-            recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += smartPunctuation(transcript) + ' ';
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
-
-                if (finalTranscript) {
-                    currentTranscript += finalTranscript;
-                    output.value = currentTranscript;
-                    output.scrollTop = output.scrollHeight;
-                }
-            };
-        }
-
-        function updateButtonStates() {
-            startBtn.disabled = isRecording;
-            stopBtn.disabled = !isRecording;
-            startBtn.classList.toggle('recording', isRecording);
-        }
-
-        function disableButtons() {
-            startBtn.disabled = true;
-            stopBtn.disabled = true;
-            saveBtn.disabled = true;
-        }
-
-        function applySwedishRules(text) {
-            const swedishQuestionWords = /\b(vad|hur|varför|när|var|vem|vilken|vilket|vilka|vems|hurdan|varifrån|vart|varav|varmed|varför|vartill)\b[^.!?]*$/gi;
-            const swedishExclamations = /\b(wow|fantastiskt|underbart|härligt|otroligt|jättebra|toppen|superbra|kanon|grymt|perfekt|lysande|strålande|utmärkt|brilliant|fenomenalt)\b[^.!?]*$/gi;
-            const swedishQuotations = /\b(sa|säger|berättade|nämnde|frågade|svarade|påstod|menade|förklarade|beskrev|uttryckte|konstaterade|påpekade)\b\s+(att\s+)?([^.!?]+)/gi;
-            const swedishConjunctions = /\b(och|eller|men|för|att|eftersom|därför|så|när|om|innan|efter|sedan|fastän|trots)\b/gi;
-
-            text = text.replace(swedishQuestionWords, match => `${match}?`);
-            text = text.replace(swedishExclamations, match => `${match}!`);
-            text = text.replace(swedishQuotations, (_, verb, att, speech) => `${verb} "${speech.trim()}"`);
-
-            // Apply Swedish vocabulary rules
-            Object.keys(swedishVocabulary).forEach(ruleKey => {
-                text = text.replace(swedishVocabulary[ruleKey], match => 
-                    match.charAt(0).toUpperCase() + match.slice(1).toLowerCase());
-            });
-
-            return text;
-        }
-
-        function applyEnglishRules(text) {
-            const englishQuestionWords = /\b(what|how|why|when|where|who|which|whose|whom)\b[^.!?]*$/gi;
-            const englishExclamations = /\b(wow|amazing|great|awesome|excellent)\b[^.!?]*$/gi;
-
-            text = text.replace(englishQuestionWords, match => `${match}?`);
-            text = text.replace(englishExclamations, match => `${match}!`);
-
-            return text;
-        }
-
-        function smartPunctuation(text) {
-            const lang = recognition.lang;
-            text = text.trim().replace(/\s+/g, ' ');
-
-            if (lang === 'sv-SE') {
-                text = applySwedishRules(text);
-            } else {
-                text = applyEnglishRules(text);
-            }
-
-            text = applyCommonFormatting(text);
-            return text;
-        }
-
-        function applyCommonFormatting(text) {
-            text = text.replace(/([.!?])\s*([a-zA-Z])/g, (_, punct, letter) => 
-                `${punct} ${letter.toUpperCase()}`);
-            text = text.replace(/\b(and|or|but)\b/g, ', $1');
-            text = text.charAt(0).toUpperCase() + text.slice(1);
-            
-            if (!text.match(/[.!?]$/)) {
-                text += '.';
-            }
-
-            return text;
-        }
-
-        startBtn.addEventListener('click', () => {
-            currentTranscript = output.value;
-            isRecording = true;
-            recognition.start();
-            updateButtonStates();
-        });
-
-        stopBtn.addEventListener('click', () => {
-            isRecording = false;
-            recognition.stop();
-            updateButtonStates();
-        });
-
-        saveBtn.addEventListener('click', () => {
-            if (output.value) {
-                const blob = new Blob([output.value], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                a.href = url;
-                a.download = `transcript-${timestamp}.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
-        });
-
-        clearBtn.addEventListener('click', () => {
-            output.value = '';
-            currentTranscript = '';
-        });
-
-        langSelect.addEventListener('change', () => {
-            if (isRecording) {
-                recognition.stop();
-            }
-            recognition.lang = langSelect.value;
-            status.textContent = `Language changed to: ${langSelect.options[langSelect.selectedIndex].text}`;
-        });
-
-        initializeSpeechRecognition();
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
